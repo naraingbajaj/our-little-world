@@ -1,0 +1,57 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --parchment: #F9F0EB;
+  --rose: #E8C4B8;
+  --rose-dark: #c9897a;
+  --rose-mid: #d4a090;
+  --sage: #A8B89A;
+  --sage-dark: #7a9868;
+  --mauve: #6B4F4F;
+  --mauve-light: #9a7070;
+  --cream: #FFF8F5;
+  --blush: #f5ddd5;
+  --lavender: #e8dff0;
+  --text: #5a3e3e;
+  --shadow: rgba(107, 79, 79, 0.08);
+  --shadow-md: rgba(107, 79, 79, 0.14);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--parchment);
+  color: var(--text);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 10% 15%, rgba(232, 196, 184, 0.3) 0%, transparent 45%),
+    radial-gradient(circle at 88% 80%, rgba(168, 184, 154, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 55% 50%, rgba(232, 223, 240, 0.15) 0%, transparent 50%);
+}
+
+button {
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+}
+
+input, textarea {
+  font-family: 'Nunito', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--blush);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rose-mid);
+  border-radius: 10px;
+}

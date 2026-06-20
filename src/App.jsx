@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
+import { supabase } from './supabase'
 import Countdowns from './components/Countdowns'
 import ThinkingOfYou from './components/ThinkingOfYou'
 import MoodCheckin from './components/MoodCheckin'
@@ -27,8 +28,72 @@ export default function App() {
   const [currentProfile, setCurrentProfile] = useState(1)
   const [editingNames, setEditingNames] = useState(false)
   const [nameInputs, setNameInputs] = useState({ p1: '', p2: '' })
+  const [syncing, setSyncing] = useState(false)
+  const [online, setOnline] = useState(true)
+  const saveTimeout = useRef(null)
+  const isRemoteUpdate = useRef(false)
 
   const name = (n) => pName(state.names, n)
+
+  // LOAD from Supabase on mount
+  useEffect(() => {
+    async function loadState() {
+      setSyncing(true)
+      const { data, error } = await supabase
+        .from('couple_state')
+        .select('data')
+        .eq('id', 'shared')
+        .single()
+
+      if (!error && data?.data && Object.keys(data.data).length > 0) {
+        isRemoteUpdate.current = true
+        setState(data.data)
+      }
+      setSyncing(false)
+    }
+    loadState()
+  }, [])
+
+  // REAL-TIME subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('couple_state_changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'couple_state' },
+        (payload) => {
+          if (payload.new?.data) {
+            isRemoteUpdate.current = true
+            setState(payload.new.data)
+          }
+        }
+      )
+      .subscribe((status) => {
+        setOnline(status === 'SUBSCRIBED')
+      })
+
+    return () => supabase.removeChannel(channel)
+  }, [])
+
+  // SAVE to Supabase (debounced 800ms)
+  useEffect(() => {
+    if (isRemoteUpdate.current) {
+      isRemoteUpdate.current = false
+      return
+    }
+
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
+    saveTimeout.current = setTimeout(async () => {
+      setSyncing(true)
+      await supabase
+        .from('couple_state')
+        .update({ data: state, updated_at: new Date().toISOString() })
+        .eq('id', 'shared')
+      setSyncing(false)
+    }, 800)
+
+    return () => clearTimeout(saveTimeout.current)
+  }, [state])
 
   function saveNames() {
     setState(s => ({
@@ -44,7 +109,6 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh' }}>
 
-      {/* ── HEADER ── */}
       <header style={{ textAlign: 'center', padding: '2.5rem 1rem 1rem', position: 'relative' }}>
         <motion.div
           initial={{ opacity: 0, y: -16 }}
@@ -71,10 +135,24 @@ export default function App() {
             made with love, for the two of us
           </p>
 
-          {/* decorative divider */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+            marginTop: '0.6rem', fontSize: '0.7rem', color: 'var(--mauve-light)',
+          }}>
+            <motion.div
+              animate={syncing ? { opacity: [1, 0.3, 1] } : {}}
+              transition={{ repeat: Infinity, duration: 1 }}
+              style={{
+                width: '6px', height: '6px', borderRadius: '50%',
+                background: syncing ? '#e8c84a' : online ? 'var(--sage-dark)' : '#d47070',
+              }}
+            />
+            {syncing ? 'syncing...' : online ? 'synced 🌸' : 'offline'}
+          </div>
+
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.75rem',
-            justifyContent: 'center', margin: '1.25rem auto 0', color: 'var(--rose)',
+            justifyContent: 'center', margin: '1rem auto 0', color: 'var(--rose)',
           }}>
             <div style={{ height: '1px', width: '60px', background: 'linear-gradient(to right, transparent, var(--rose))' }} />
             🌸
@@ -83,7 +161,6 @@ export default function App() {
         </motion.div>
       </header>
 
-      {/* ── PROFILE SWITCHER ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -118,7 +195,6 @@ export default function App() {
           </motion.button>
         ))}
 
-        {/* Edit names button */}
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => {
@@ -134,7 +210,6 @@ export default function App() {
         >✏️</motion.button>
       </motion.div>
 
-      {/* ── EDIT NAMES MODAL ── */}
       <AnimatePresence>
         {editingNames && (
           <motion.div
@@ -212,7 +287,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── COUNTDOWNS ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -222,7 +296,6 @@ export default function App() {
         <Countdowns />
       </motion.div>
 
-      {/* ── MAIN GRID ── */}
       <main style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -248,7 +321,6 @@ export default function App() {
           </motion.div>
         ))}
 
-        {/* Love notes spans full width */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,7 +331,6 @@ export default function App() {
         </motion.div>
       </main>
 
-      {/* ── FOOTER ── */}
       <footer style={{ textAlign: 'center', padding: '1.5rem', fontSize: '0.75rem', color: 'var(--mauve-light)', fontStyle: 'italic' }}>
         made with 🌷 for you two
       </footer>
